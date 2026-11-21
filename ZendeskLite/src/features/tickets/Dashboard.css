@@ -1,0 +1,297 @@
+
+/* Dashboard layout */
+
+.dashboard {
+    width: min(1440px, calc(100% - 64px));
+    margin: 0 auto;
+    padding: 36px 0 60px;
+}
+
+/* Welcome banner */
+
+.welcome-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    padding: 34px 38px;
+    background: rgb(209, 244, 112);
+    border-radius: 18px;
+    margin-bottom: 38px;
+}
+
+.welcome-content {
+    max-width: 600px;
+}
+
+.eyebrow {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    color: #53652b;
+    margin-bottom: 12px;
+}
+
+.welcome-banner h1 {
+    font-size: 30px;
+    font-weight: 700;
+    letter-spacing: -1px;
+    color: #20221e;
+    margin: 0 0 8px;
+}
+
+.welcome-banner p {
+    font-size: 14px;
+    color: #4f583d;
+    margin: 0;
+    line-height: 1.6;
+}
+
+/* Create ticket button */
+
+.primary-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
+    padding: 13px 20px;
+    border: none;
+    border-radius: 9px;
+    background: #20221e;
+    color: white;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.primary-button span {
+    font-size: 19px;
+    line-height: 12px;
+}
+
+.primary-button:hover {
+    background: #383b32;
+    transform: translateY(-1px);
+}
+
+/* Ticket section */
+
+.ticket-section {
+    width: 100%;
+}
+
+.section-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 22px;
+}
+
+.section-heading h2 {
+    font-size: 21px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    color: #20221e;
+    margin: 0 0 5px;
+}
+
+.section-heading p {
+    font-size: 13px;
+    color: #85877f;
+    margin: 0;
+}
+
+.total-tickets {
+    font-size: 12px;
+    color: #77796f;
+    font-weight: 500;
+}
+
+/* Quick filters */
+
+.filter-bar {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    margin-bottom: 24px;
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+
+.filter-bar::-webkit-scrollbar {
+    display: none;
+}
+
+.filter-button {
+    padding: 9px 17px;
+    border: 1px solid #e9ebe5;
+    border-radius: 30px;
+    background: white;
+    color: #6d7067;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.2s ease;
+}
+
+.filter-button:hover {
+    border-color: #c7df84;
+    background: #f8fbeF;
+}
+
+.filter-button.active {
+    background: rgb(209, 244, 112);
+    color: #20221e;
+    border-color: rgb(209, 244, 112);
+    font-weight: 650;
+}
+
+/* Four-column swimlane board */
+
+.swimlane-board {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(240px, 1fr));
+    gap: 16px;
+    align-items: stretch;
+    width: 100%;
+    overflow-x: auto;
+    padding-bottom: 12px;
+    scrollbar-width: thin;
+}
+
+.swimlane {
+    min-width: 0;
+    min-height: 420px;
+    padding: 16px;
+    background: #f5f8eb;
+    border: 1px solid #e1eacb;
+    border-radius: 14px;
+}
+
+/* Lane heading */
+
+.swimlane-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 18px;
+    padding-bottom: 13px;
+    border-bottom: 1px solid #e5ebd6;
+}
+
+.lane-title {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+}
+
+.lane-title h3 {
+    font-size: 13px;
+    font-weight: 650;
+    color: #303328;
+    margin: 0;
+}
+
+.lane-count {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 25px;
+    height: 25px;
+    padding: 0 7px;
+    border-radius: 20px;
+    background: rgb(209, 244, 112);
+    color: #20221e;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+/* Status indicators */
+
+.status-indicator {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #a2a49b;
+}
+
+.status-open {
+    background: #91bd35;
+}
+
+.status-pending {
+    background: #e6a23c;
+}
+
+.status-solved {
+    background: #56a879;
+}
+
+.status-closed {
+    background: #92958b;
+}
+
+/* Ticket cards */
+
+.swimlane-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+/* Empty lane */
+
+.lane-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100px;
+    padding: 16px;
+    border: 1px dashed #dce4ca;
+    border-radius: 10px;
+    color: #92958a;
+    font-size: 12px;
+    text-align: center;
+}
+
+/* Responsive */
+
+@media (max-width: 1100px) {
+    .swimlane-board {
+        grid-template-columns: repeat(4, minmax(240px, 1fr));
+    }
+
+    .dashboard {
+        width: calc(100% - 40px);
+    }
+}
+
+@media (max-width: 640px) {
+    .dashboard {
+        width: calc(100% - 28px);
+        padding-top: 24px;
+    }
+
+    .welcome-banner {
+        align-items: flex-start;
+        flex-direction: column;
+        padding: 25px;
+        gap: 22px;
+    }
+
+    .welcome-banner h1 {
+        font-size: 25px;
+    }
+
+    .section-heading h2 {
+        font-size: 19px;
+    }
+
+    .swimlane-board {
+        grid-template-columns: repeat(4, minmax(260px, 1fr));
+    }
+}
