@@ -1,0 +1,142 @@
+
+.ticket-card {
+    background: #ffffff;
+    border: 1px solid #e9ebe5;
+    border-radius: 11px;
+    padding: 15px;
+    cursor: pointer;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease,
+    transform 0.2s ease;
+}
+
+.ticket-card:hover {
+    border-color: #c8e77c;
+    box-shadow: 0 5px 16px rgba(44, 56, 20, 0.07);
+    transform: translateY(-2px);
+}
+
+.ticket-card:focus-visible {
+    outline: 2px solid #91bd35;
+    outline-offset: 3px;
+}
+
+.ticket-card-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.ticket-id {
+    font-size: 10px;
+    font-weight: 600;
+    color: #92958b;
+}
+
+.ticket-open-icon {
+    color: #a3a69b;
+    transition: color 0.2s ease;
+}
+
+.ticket-card:hover .ticket-open-icon {
+    color: #617d22;
+}
+
+.ticket-title {
+    font-size: 13px;
+    font-weight: 650;
+    line-height: 1.45;
+    color: #292b25;
+    margin: 0 0 7px;
+}
+
+.ticket-description {
+    font-size: 11px;
+    line-height: 1.6;
+    color: #85877f;
+    margin: 0 0 14px;
+
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.ticket-card-footer {
+    display: flex;
+    align-items: center;
+    margin-bottom: 13px;
+}
+
+.priority-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 5px 9px;
+    border-radius: 20px;
+    background: #f5f6f2;
+    color: #62655c;
+}
+
+.priority-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+}
+
+.priority-low {
+    color: #6c9477;
+    background: #edf5ef;
+}
+
+.priority-medium {
+    color: #a67a32;
+    background: #fbf3e4;
+}
+
+.priority-high {
+    color: #c16c43;
+    background: #fff0e9;
+}
+
+.priority-urgent {
+    color: #c14d4d;
+    background: #fcecec;
+}
+
+.ticket-card-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    padding-top: 11px;
+    border-top: 1px solid #f0f1ed;
+}
+
+.ticket-assignee,
+.ticket-date {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    min-width: 0;
+    font-size: 10px;
+    color: #85877f;
+}
+
+.ticket-assignee span,
+.ticket-date span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ticket-assignee {
+    flex: 1;
+}
+
+.ticket-date {
+    flex-shrink: 0;
+}

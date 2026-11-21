@@ -1,0 +1,175 @@
+
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: rgba(24, 27, 20, 0.42);
+    backdrop-filter: blur(4px);
+}
+
+.create-ticket-modal {
+    width: 100%;
+    max-width: 480px;
+    max-height: calc(100vh - 40px);
+    overflow-y: auto;
+    background: #ffffff;
+    border-radius: 17px;
+    padding: 28px;
+    box-shadow: 0 20px 70px rgba(0, 0, 0, 0.15);
+    animation: modal-enter 0.2s ease-out;
+}
+
+@keyframes modal-enter {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.modal-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 26px;
+}
+
+.modal-eyebrow {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1.3px;
+    color: #779c2d;
+    margin-bottom: 9px;
+}
+
+.modal-header h2 {
+    font-size: 22px;
+    letter-spacing: -0.6px;
+    color: #20221e;
+    margin: 0 0 7px;
+}
+
+.modal-header p {
+    font-size: 12px;
+    color: #85877f;
+    margin: 0;
+}
+
+.modal-close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border: none;
+    border-radius: 8px;
+    background: #f5f6f2;
+    color: #55584f;
+    cursor: pointer;
+}
+
+.modal-close:hover {
+    background: #edf5df;
+}
+
+.form-field {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 19px;
+}
+
+.form-field label {
+    font-size: 12px;
+    font-weight: 650;
+    color: #35372f;
+}
+
+.form-field input,
+.form-field textarea,
+.form-field select {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 12px 13px;
+    border: 1px solid #e5e7df;
+    border-radius: 8px;
+    outline: none;
+    background: #ffffff;
+    color: #303328;
+    font-family: inherit;
+    font-size: 12px;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.form-field input:focus,
+.form-field textarea:focus,
+.form-field select:focus {
+    border-color: #a9d64b;
+    box-shadow: 0 0 0 3px rgba(209, 244, 112, 0.25);
+}
+
+.form-field input::placeholder,
+.form-field textarea::placeholder {
+    color: #a6a89f;
+}
+
+.form-field textarea {
+    resize: vertical;
+    min-height: 100px;
+    line-height: 1.6;
+}
+
+.modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 28px;
+    padding-top: 20px;
+    border-top: 1px solid #eff0ec;
+}
+
+.secondary-button,
+.modal-submit {
+    padding: 11px 17px;
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+.secondary-button {
+    background: #ffffff;
+    color: #62655c;
+    border: 1px solid #e5e7df;
+}
+
+.secondary-button:hover {
+    background: #f7f8f4;
+}
+
+.modal-submit {
+    background: rgb(209, 244, 112);
+    color: #20221e;
+    border: 1px solid rgb(209, 244, 112);
+}
+
+.modal-submit:hover {
+    background: #c1e65b;
+}
+
+@media (max-width: 480px) {
+    .create-ticket-modal {
+        padding: 22px;
+    }
+}
