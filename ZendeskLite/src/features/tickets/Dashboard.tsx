@@ -14,6 +14,7 @@ import type {
 } from "../../data/tickets";
 
 import { getTickets, createTicket } from "./ticketApi";
+import "./Dashboard.css";
 
 // Temporary logged-in user.
 // Later, this information will come from authentication.
@@ -62,7 +63,7 @@ function Dashboard() {
         refetch,
     } = useQuery({
         queryKey: ["tickets"],
-        queryFn: getTickets,
+        queryFn: () => getTickets(),
     });
 
     const mapStatus = (status: string): TicketStatus => {

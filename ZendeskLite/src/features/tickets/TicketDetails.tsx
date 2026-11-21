@@ -1,5 +1,5 @@
 
-import { useState, type FormEvent } from "react";
+import { useState, type FormEvent, type ChangeEvent } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
     useMutation,
@@ -17,13 +17,14 @@ import {
     UserRound,
 } from "lucide-react";
 
+import "./TicketDetails.css";
+
 import {
     getTicketById,
     updateTicket,
     type ApiTicketStatus,
 } from "./ticketApi";
 
-import "./TicketDetails.css";
 
 interface Comment {
     id: number;
@@ -110,7 +111,7 @@ function TicketDetails() {
     });
 
     const handleStatusChange = (
-        event: React.ChangeEvent<HTMLSelectElement>
+        event: ChangeEvent<HTMLSelectElement>
     ) => {
         updateMutation.mutate({
             status: event.target.value as ApiTicketStatus,
