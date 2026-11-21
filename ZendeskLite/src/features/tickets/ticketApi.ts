@@ -72,13 +72,15 @@ async function handleResponse<T>(
     return response.json();
 }
 
+const BASE_URL = "http://localhost:8080"
+
 // GET /api/tickets
 export async function getTickets(
     page = 0,
     size = 10
 ): Promise<TicketApiResponse> {
     const response = await fetch(
-        `/api/tickets?page=${page}&size=${size}`
+        `${BASE_URL}/api/tickets?page=${page}&size=${size}`
     );
 
     return handleResponse<TicketApiResponse>(response);
@@ -88,7 +90,7 @@ export async function getTickets(
 export async function createTicket(
     payload: CreateTicketPayload
 ): Promise<ApiTicket> {
-    const response = await fetch("/api/tickets", {
+    const response = await fetch(`${BASE_URL}/api/tickets`, {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
@@ -103,7 +105,7 @@ export async function createTicket(
 export async function getTicketById(
     id: string | number
 ): Promise<ApiTicket> {
-    const response = await fetch(`/api/tickets/${id}`);
+    const response = await fetch(`${BASE_URL}/api/tickets/${id}`);
 
     return handleResponse<ApiTicket>(response);
 }
@@ -113,7 +115,7 @@ export async function updateTicket(
     id: string | number,
     payload: UpdateTicketPayload
 ): Promise<ApiTicket> {
-    const response = await fetch(`/api/tickets/${id}`, {
+    const response = await fetch(`${BASE_URL}/api/tickets/${id}`, {
         method: "PATCH",
         headers: {
             "Content-Type": "application/json",
