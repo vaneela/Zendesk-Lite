@@ -188,7 +188,7 @@ function Dashboard() {
                             className="primary-button"
                             onClick={() => setIsModalOpen(true)}
                         >
-                            + Create Ticket
+                            Create Ticket
                         </button>
                     )}
                 </section>
