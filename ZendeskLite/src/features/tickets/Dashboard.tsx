@@ -54,6 +54,17 @@ function Dashboard() {
         },
     });
 
+    const mapStatus = (status: string): TicketStatus => {
+        const statusMap: Record<string, TicketStatus> = {
+            OPEN: "Open",
+            PENDING: "Pending",
+            SOLVED: "Solved",
+            CLOSED: "Closed",
+        };
+
+        return statusMap[status] ?? "Open";
+    };
+
     // Fetch tickets using TanStack Query.
     const {
         data,
@@ -66,32 +77,16 @@ function Dashboard() {
         queryFn: () => getTickets(),
     });
 
-    const mapStatus = (status: string): TicketStatus => {
-        const statusMap: Record<string, TicketStatus> = {
-            OPEN: "Open",
-            PENDING: "Pending",
-            IN_PROGRESS: "Pending",
-            SOLVED: "Solved",
-            CLOSED: "Closed",
-        };
-
-        return statusMap[status] ?? "Open";
-    };
-
-    // Convert backend response into frontend Ticket structure.
-    const apiTickets: Ticket[] = (data?.content ?? []).map(
-        (ticket) => ({
-            id: String(ticket.id),
-            title: ticket.title,
-            description: ticket.description ?? "",
-            status: mapStatus(ticket.status),
-            priority:
-                ticket.priority.charAt(0) +
-                ticket.priority.slice(1).toLowerCase(),
-            assignee: ticket.assignee?.name ?? "Unassigned",
-            createdAt: new Date(ticket.createdAt).toLocaleString(),
-        })
-    );
+// Convert backend response into frontend Ticket structure.
+    const apiTickets: Ticket[] = (data ?? []).map((ticket) => ({
+        id: String(ticket.id),
+        title: ticket.subject,
+        description: `Requested by ${ticket.requesterName} (${ticket.requesterEmail})`,
+        status: mapStatus(ticket.status),
+        priority: "Medium",
+        assignee: ticket.assignee?.name ?? "Unassigned",
+        createdAt: new Date(ticket.createdAt).toLocaleString(),
+    }));
 
 // API tickets are the source of truth.
     const tickets = apiTickets;

@@ -150,7 +150,4 @@ const initialTickets: ApiTicket[] = [
 
 // Shared in-memory mock database.
 // Mutations here are visible to all API functions.
-export const mockDatabase = {
-    tickets: initialTickets,
-    nextTicketId: 113,
-};
+export const mockDatabase = initialTickets

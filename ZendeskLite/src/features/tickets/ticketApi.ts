@@ -32,6 +32,17 @@ export interface ApiTicket {
     updatedAt: string;
 }
 
+export interface ApiTicketListItem {
+    id: number;
+    subject: string;
+    requesterName: string;
+    requesterEmail: string;
+    status: ApiTicketStatus;
+    assignee: ApiAssignee | null;
+    createdAt: string;
+    updatedAt: string;
+}
+
 export interface TicketApiResponse {
     content: ApiTicket[];
     page: number;
@@ -117,26 +128,12 @@ async function handleResponse<T>(
 // GET /api/tickets
 // --------------------------------------------------
 
-export async function getTickets(
-    page = 0,
-    size = 10
-): Promise<TicketApiResponse> {
+export async function getTickets(): Promise<ApiTicketListItem[]> {
     if (USE_MOCK_API) {
         await delay();
 
-        const allTickets = mockDatabase.tickets;
-        const totalElements = allTickets.length;
-        const totalPages = Math.ceil(totalElements / size);
+        return mockDatabase.tickets;
 
-        return {
-            content: allTickets
-                .slice(page * size, page * size + size)
-                .map((ticket) => ({ ...ticket })),
-            page,
-            size,
-            totalElements,
-            totalPages,
-        };
     }
 
     const response = await fetch(
