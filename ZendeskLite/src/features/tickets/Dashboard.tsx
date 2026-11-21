@@ -1,195 +1,181 @@
 
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMemo, useState } from "react";
+import {
+    useMutation,
+    useQuery,
+    useQueryClient,
+} from "@tanstack/react-query";
 
 import Header from "../../components/Header";
 import TicketCard from "../../components/TicketCard";
 import CreateTicketModal from "../../components/CreateTicketModal";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import './Dashboard.css'
+
+import {
+    createTicket,
+    getTickets,
+    type ApiTicketPriority,
+    type ApiTicketStatus,
+} from "./ticketApi";
 
 import type {
     Ticket,
     TicketStatus,
-    TicketPriority,
 } from "../../data/tickets";
 
-import { getTickets, createTicket } from "./ticketApi";
-import "./Dashboard.css";
-
-// Temporary logged-in user.
-// Later, this information will come from authentication.
 type UserRole = "Admin" | "User" | "Agent";
+type TicketFilter = "all" | "mine" | "unassigned";
 
 const currentUser = {
     name: "Alex Morgan",
     role: "Admin" as UserRole,
 };
 
-const statuses: TicketStatus[] = [
+const statusMap: Record<ApiTicketStatus, TicketStatus> = {
+    OPEN: "Open",
+    PENDING: "Pending",
+    SOLVED: "Solved",
+    CLOSED: "Closed",
+};
+
+const priorityMap: Record<
+    Ticket["priority"],
+    ApiTicketPriority
+> = {
+    Low: "LOW",
+    Medium: "MEDIUM",
+    High: "HIGH",
+    Urgent: "URGENT",
+};
+
+const lanes: TicketStatus[] = [
     "Open",
     "Pending",
     "Solved",
     "Closed",
 ];
 
-type FilterType = "all" | "mine" | "unassigned";
-
 function Dashboard() {
-    const [activeFilter, setActiveFilter] =
-        useState<FilterType>("all");
-
-    const [isModalOpen, setIsModalOpen] = useState(false);
-
     const queryClient = useQueryClient();
 
-    const createTicketMutation = useMutation({
-        mutationFn: createTicket,
+    const [showCreateModal, setShowCreateModal] = useState(false);
+    const [activeFilter, setActiveFilter] =
+        useState<TicketFilter>("all");
 
-        onSuccess: () => {
-            queryClient.invalidateQueries({
-                queryKey: ["tickets"],
-            });
+    const isAgent = currentUser.role === "Agent";
+    const canCreateTicket =
+        currentUser.role === "Admin" ||
+        currentUser.role === "User";
 
-            setIsModalOpen(false);
-        },
-    });
+    // -----------------------------------------------
+    // Fetch tickets
+    // -----------------------------------------------
 
-    const mapStatus = (status: string): TicketStatus => {
-        const statusMap: Record<string, TicketStatus> = {
-            OPEN: "Open",
-            PENDING: "Pending",
-            SOLVED: "Solved",
-            CLOSED: "Closed",
-        };
-
-        return statusMap[status] ?? "Open";
-    };
-
-    // Fetch tickets using TanStack Query.
     const {
         data,
         isLoading,
         isError,
         error,
-        refetch,
     } = useQuery({
         queryKey: ["tickets"],
         queryFn: () => getTickets(),
     });
 
-// Convert backend response into frontend Ticket structure.
-    const apiTickets: Ticket[] = (data ?? []).map((ticket) => ({
-        id: String(ticket.id),
-        title: ticket.subject,
-        description: `Requested by ${ticket.requesterName} (${ticket.requesterEmail})`,
-        status: mapStatus(ticket.status),
-        priority: "Medium",
-        assignee: ticket.assignee?.name ?? "Unassigned",
-        createdAt: new Date(ticket.createdAt).toLocaleString(),
-    }));
+    // The list API returns a plain array, not { content: [] }.
+    const tickets: Ticket[] = useMemo(
+        () =>
+            (data ?? []).map((ticket) => ({
+                id: String(ticket.id),
+                title: ticket.subject,
+                description: `Requested by ${ticket.requesterName} (${ticket.requesterEmail})`,
+                status: statusMap[ticket.status],
+                priority: "Medium",
+                assignee: ticket.assignee?.name ?? "Unassigned",
+                createdAt: new Date(ticket.createdAt).toLocaleString(),
+            })),
+        [data]
+    );
 
-// API tickets are the source of truth.
-    const tickets = apiTickets;
+    // -----------------------------------------------
+    // Apply dashboard filters
+    // -----------------------------------------------
 
-    // Apply selected filter.
-    const filteredTickets = tickets.filter((ticket) => {
-        if (
-            activeFilter === "mine" &&
-            currentUser.role === "Agent"
-        ) {
-            return ticket.assignee === currentUser.name;
+    const filteredTickets = useMemo(() => {
+        switch (activeFilter) {
+            case "mine":
+                return tickets.filter(
+                    (ticket) => ticket.assignee === currentUser.name
+                );
+
+            case "unassigned":
+                return tickets.filter(
+                    (ticket) => ticket.assignee === "Unassigned"
+                );
+
+            default:
+                return tickets;
         }
+    }, [tickets, activeFilter]);
 
-        if (activeFilter === "unassigned") {
-            return ticket.assignee === "Unassigned";
-        }
+    // -----------------------------------------------
+    // Create ticket
+    // -----------------------------------------------
 
-        return true;
+    const createMutation = useMutation({
+        mutationFn: (payload: {
+            title: string;
+            description: string;
+            priority: Ticket["priority"];
+        }) =>
+            createTicket({
+                title: payload.title,
+                description: payload.description,
+                priority: priorityMap[payload.priority],
+            }),
+
+        onSuccess: async () => {
+            await queryClient.invalidateQueries({
+                queryKey: ["tickets"],
+            });
+
+            setShowCreateModal(false);
+        },
     });
 
-
-    const handleCreateTicket = (ticketData: {
+    const handleCreateTicket = (payload: {
         title: string;
         description: string;
-        priority: TicketPriority;
+        priority: Ticket["priority"];
     }) => {
-        createTicketMutation.mutate({
-            title: ticketData.title,
-            description: ticketData.description,
-            priority: ticketData.priority.toUpperCase() as
-                | "LOW"
-                | "MEDIUM"
-                | "HIGH"
-                | "URGENT",
-        });
+        createMutation.mutate(payload);
     };
 
-    // Loading state.
-    if (isLoading) {
-        return (
-            <div className="app-shell">
-                <Header />
-                <main className="dashboard">
-                    <div className="dashboard-message">
-                        Loading tickets...
-                    </div>
-                </main>
-            </div>
-        );
-    }
-
-    // Error state.
-    if (isError) {
-        return (
-            <div className="app-shell">
-                <Header />
-                <main className="dashboard">
-                    <div className="dashboard-message error">
-                        <p>
-                            {error instanceof Error
-                                ? error.message
-                                : "Something went wrong while fetching tickets."}
-                        </p>
-
-                        <button
-                            className="primary-button"
-                            onClick={() => refetch()}
-                        >
-                            Try again
-                        </button>
-                    </div>
-                </main>
-            </div>
-        );
-    }
+    // -----------------------------------------------
+    // Render
+    // -----------------------------------------------
 
     return (
         <div className="app-shell">
             <Header />
 
             <main className="dashboard">
-                {/* Welcome section */}
                 <section className="welcome-banner">
                     <div>
-                        <p className="eyebrow">SUPPORT OVERVIEW</p>
-                        <h1>Welcome back, {currentUser.name}</h1>
-                        <p>
-                            Here's what's happening with your support tickets.
-                        </p>
+                        <h1>Good day, {currentUser.name}</h1>
+                        <p>Here's what's happening with your tickets.</p>
                     </div>
 
-                    {(currentUser.role === "Admin" ||
-                        currentUser.role === "User") && (
+                    {canCreateTicket && (
                         <button
                             className="primary-button"
-                            onClick={() => setIsModalOpen(true)}
+                            onClick={() => setShowCreateModal(true)}
                         >
-                            Create Ticket
+                            + Create Ticket
                         </button>
                     )}
                 </section>
 
-                {/* Ticket filters */}
+                {/* Filters */}
                 <section className="filter-bar">
                     <button
                         className={`filter-button ${
@@ -200,7 +186,7 @@ function Dashboard() {
                         All Tickets
                     </button>
 
-                    {currentUser.role === "Agent" && (
+                    {isAgent && (
                         <button
                             className={`filter-button ${
                                 activeFilter === "mine" ? "active" : ""
@@ -221,53 +207,64 @@ function Dashboard() {
                     </button>
                 </section>
 
-                {/* Ticket count */}
-                <p className="ticket-count">
-                    Showing {filteredTickets.length} tickets
-                    {data && ` of ${data.totalElements}`}
-                </p>
+                {/* Loading */}
+                {isLoading && (
+                    <div className="dashboard-message">
+                        Loading tickets...
+                    </div>
+                )}
 
-                {/* Four horizontal swimlanes */}
-                <section className="swimlane-board">
-                    {statuses.map((status) => {
-                        const laneTickets = filteredTickets.filter(
-                            (ticket) => ticket.status === status
-                        );
+                {/* Error */}
+                {isError && (
+                    <div className="dashboard-message error">
+                        {error instanceof Error
+                            ? error.message
+                            : "Something went wrong while loading tickets."}
+                    </div>
+                )}
 
-                        return (
-                            <div className="swimlane" key={status}>
-                                <div className="swimlane-header">
-                                    <h2>{status}</h2>
+                {/* Swimlanes */}
+                {!isLoading && !isError && (
+                    <section className="swimlane-board">
+                        {lanes.map((status) => {
+                            const laneTickets = filteredTickets.filter(
+                                (ticket) => ticket.status === status
+                            );
 
-                                    <span className="lane-count">
-                    {laneTickets.length}
-                  </span>
+                            return (
+                                <div className="swimlane" key={status}>
+                                    <div className="swimlane-header">
+                                        <h2>{status}</h2>
+                                        <span className="lane-count">
+                      {laneTickets.length}
+                    </span>
+                                    </div>
+
+                                    <div className="swimlane-cards">
+                                        {laneTickets.length > 0 ? (
+                                            laneTickets.map((ticket) => (
+                                                <TicketCard
+                                                    key={ticket.id}
+                                                    ticket={ticket}
+                                                />
+                                            ))
+                                        ) : (
+                                            <div className="lane-empty">
+                                                No tickets
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
-
-                                <div className="swimlane-cards">
-                                    {laneTickets.length > 0 ? (
-                                        laneTickets.map((ticket) => (
-                                            <TicketCard
-                                                key={ticket.id}
-                                                ticket={ticket}
-                                            />
-                                        ))
-                                    ) : (
-                                        <p className="lane-empty">
-                                            No {status.toLowerCase()} tickets
-                                        </p>
-                                    )}
-                                </div>
-                            </div>
-                        );
-                    })}
-                </section>
+                            );
+                        })}
+                    </section>
+                )}
             </main>
 
-            {/* Create ticket modal */}
-            {isModalOpen && (
+            {/* Create Ticket Modal */}
+            {showCreateModal && (
                 <CreateTicketModal
-                    onClose={() => setIsModalOpen(false)}
+                    onClose={() => setShowCreateModal(false)}
                     onCreate={handleCreateTicket}
                 />
             )}

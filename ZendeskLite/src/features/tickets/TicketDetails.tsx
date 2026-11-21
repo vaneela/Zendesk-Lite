@@ -1,59 +1,39 @@
 
-import { useState, type FormEvent, type ChangeEvent } from "react";
+import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
     useMutation,
     useQuery,
     useQueryClient,
 } from "@tanstack/react-query";
-
 import {
     ArrowLeft,
-    CalendarDays,
-    Clock3,
+    User,
+    Calendar,
     MessageSquare,
     Send,
-    Ticket as TicketIcon,
-    UserRound,
+    UserX,
 } from "lucide-react";
 
-import "./TicketDetails.css";
+import Header from "../../components/Header";
+import './TicketDetails.css'
 
 import {
     getTicketById,
-    updateTicket,
+    updateTicketStatus,
+    assignTicket,
     type ApiTicketStatus,
 } from "./ticketApi";
 
+// --------------------------------------------------
+// Helpers
+// --------------------------------------------------
 
-interface Comment {
-    id: number;
-    author: string;
-    message: string;
-    createdAt: string;
-}
-
-const statusOptions: {
-    label: string;
-    value: ApiTicketStatus;
-}[] = [
-    { label: "Open", value: "OPEN" },
-    { label: "Pending", value: "PENDING" },
-    { label: "Solved", value: "SOLVED" },
-    { label: "Closed", value: "CLOSED" },
-];
-
-const allowedTransitions: Record<
-    ApiTicketStatus,
-    ApiTicketStatus[]
-> = {
-    OPEN: ["OPEN", "PENDING"],
-    PENDING: ["PENDING", "SOLVED"],
-    SOLVED: ["SOLVED", "CLOSED", "PENDING"],
-    CLOSED: ["CLOSED"],
-
-    // Legacy status, if existing tickets still use it.
-    IN_PROGRESS: ["IN_PROGRESS", "SOLVED"],
+const statusLabels: Record<ApiTicketStatus, string> = {
+    OPEN: "Open",
+    PENDING: "Pending",
+    SOLVED: "Solved",
+    CLOSED: "Closed",
 };
 
 const priorityLabels: Record<string, string> = {
@@ -63,34 +43,26 @@ const priorityLabels: Record<string, string> = {
     URGENT: "Urgent",
 };
 
-function formatDate(date: string) {
-    return new Date(date).toLocaleString("en-IN", {
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-        hour: "numeric",
-        minute: "2-digit",
-    });
+function formatDate(date: string): string {
+    return new Date(date).toLocaleString();
 }
+
+// --------------------------------------------------
+// Component
+// --------------------------------------------------
 
 function TicketDetails() {
     const { ticketId } = useParams<{ ticketId: string }>();
     const navigate = useNavigate();
     const queryClient = useQueryClient();
 
-    const [reply, setReply] = useState("");
+    const [comment, setComment] = useState("");
+    const [localComments, setLocalComments] = useState<string[]>([]);
 
-    // Temporary local comments until comments API is connected.
-    const [comments, setComments] = useState<Comment[]>([
-        {
-            id: 1,
-            author: "Alex Morgan",
-            message: "We are looking into this issue.",
-            createdAt: "Today",
-        },
-    ]);
+    // -----------------------------------------------
+    // Fetch ticket details
+    // -----------------------------------------------
 
-    // Fetch ticket details.
     const {
         data: ticket,
         isLoading,
@@ -100,249 +72,232 @@ function TicketDetails() {
         queryKey: ["ticket", ticketId],
         queryFn: () => getTicketById(ticketId!),
         enabled: Boolean(ticketId),
-        retry: false,
     });
 
-    // Update ticket.
-    const updateMutation = useMutation({
-        mutationFn: (payload: {
-            status?: ApiTicketStatus;
-            assigneeId?: number | null;
-        }) => updateTicket(ticketId!, payload),
+    // -----------------------------------------------
+    // Fetch allowed status transitions
+    // -----------------------------------------------
 
-        onSuccess: (updatedTicket) => {
+    const statuses = [
+        { status: 'OPEN', allowedTransitions: ['PENDING'] },
+        { status: 'PENDING', allowedTransitions: ['SOLVED'] },
+        { status: 'SOLVED', allowedTransitions: ['CLOSED', 'PENDING'] },
+        { status: 'CLOSED', allowedTransitions: [] },
+    ];
+
+    const allowedTransitions =
+        statuses.find((item) => item.status === ticket?.status)
+            ?.allowedTransitions ?? [];
+
+    // -----------------------------------------------
+    // Update ticket status
+    // -----------------------------------------------
+
+    const statusMutation = useMutation({
+        mutationFn: (status: ApiTicketStatus) =>
+            updateTicketStatus(ticketId!, { status }),
+
+        onSuccess: async (updatedTicket) => {
             queryClient.setQueryData(
                 ["ticket", ticketId],
                 updatedTicket
             );
 
-            queryClient.invalidateQueries({
+            await queryClient.invalidateQueries({
                 queryKey: ["tickets"],
             });
         },
     });
-    const availableStatusOptions = statusOptions.filter((option) =>
-        allowedTransitions[ticket?.status ?? "OPEN"].includes(option.value)
-    );
 
-    const handleStatusChange = (
-        event: ChangeEvent<HTMLSelectElement>
-    ) => {
-        updateMutation.mutate({
-            status: event.target.value as ApiTicketStatus,
-        });
-    };
+    // -----------------------------------------------
+    // Assign / unassign ticket
+    // -----------------------------------------------
 
-    const handleReply = (event: FormEvent<HTMLFormElement>) => {
+    const unassignMutation = useMutation({
+        mutationFn: () =>
+            assignTicket(ticketId!, { agentId: null }),
+
+        onSuccess: async (updatedTicket) => {
+            queryClient.setQueryData(
+                ["ticket", ticketId],
+                updatedTicket
+            );
+
+            await queryClient.invalidateQueries({
+                queryKey: ["tickets"],
+            });
+        },
+    });
+
+    // -----------------------------------------------
+    // Local conversation comments
+    // -----------------------------------------------
+
+    const handleAddComment = (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
 
-        if (!reply.trim()) return;
+        const trimmedComment = comment.trim();
 
-        const newComment: Comment = {
-            id: Date.now(),
-            author: "Alex Morgan",
-            message: reply.trim(),
-            createdAt: "Just now",
-        };
+        if (!trimmedComment) return;
 
-        setComments((previous) => [...previous, newComment]);
-        setReply("");
+        setLocalComments((previous) => [
+            ...previous,
+            trimmedComment,
+        ]);
+
+        setComment("");
     };
 
-    // Loading state.
+    // -----------------------------------------------
+    // Loading and error states
+    // -----------------------------------------------
+
     if (isLoading) {
         return (
-            <div className="ticket-details-page">
-                <div className="details-loading">
-                    Loading ticket details...
-                </div>
+            <div className="app-shell">
+                <Header />
+                <main className="ticket-details-page">
+                    <p>Loading ticket...</p>
+                </main>
             </div>
         );
     }
 
-    // Error state.
-    if (isError) {
-        const isNotFound =
-            error instanceof Error &&
-            error.message.toLowerCase().includes("404");
-
+    if (isError || !ticket) {
         return (
-            <div className="ticket-details-page">
-                <div className="details-error">
-                    <h2>
-                        {isNotFound
-                            ? "Ticket not found"
-                            : "Unable to load ticket"}
-                    </h2>
-
-                    <p>
-                        {error instanceof Error
-                            ? error.message
-                            : "Something went wrong."}
-                    </p>
-
+            <div className="app-shell">
+                <Header />
+                <main className="ticket-details-page">
                     <button
                         className="back-button"
                         onClick={() => navigate("/dashboard")}
                     >
                         <ArrowLeft size={16} />
-                        Back to tickets
+                        Back to dashboard
                     </button>
-                </div>
+
+                    <p className="error-message">
+                        {error instanceof Error
+                            ? error.message
+                            : "Ticket could not be loaded."}
+                    </p>
+                </main>
             </div>
         );
     }
 
-    if (!ticket) {
-        return null;
-    }
+    // -----------------------------------------------
+    // Main render
+    // -----------------------------------------------
 
     return (
-        <div className="ticket-details-page">
-            {/* Header */}
-            <header className="details-header">
+        <div className="app-shell">
+            <Header />
+
+            <main className="ticket-details-page">
+                {/* Back navigation */}
                 <button
                     className="back-button"
                     onClick={() => navigate("/dashboard")}
                 >
-                    <ArrowLeft size={17} />
-                    Back to tickets
+                    <ArrowLeft size={16} />
+                    Back to dashboard
                 </button>
 
-                <div className="details-brand">
-          <span className="brand-icon">
-            <TicketIcon size={19} />
-          </span>
-                    <span>Zendesk Lite</span>
-                </div>
-            </header>
-
-            <main className="ticket-details-container">
-                {/* Breadcrumb */}
-                <div className="details-breadcrumb">
-          <span
-              onClick={() => navigate("/dashboard")}
-              role="button"
-              tabIndex={0}
-              onKeyDown={(event) => {
-                  if (event.key === "Enter") {
-                      navigate("/dashboard");
-                  }
-              }}
-          >
-            Tickets
-          </span>
-                    <span>/</span>
-                    <span>{`#${ticket.id}`}</span>
-                </div>
-
                 {/* Ticket heading */}
-                <section className="ticket-details-heading">
+                <section className="ticket-heading">
                     <div>
-                        <p className="ticket-reference">
-                            TICKET #{ticket.id}
-                        </p>
+            <span className="ticket-reference">
+              Ticket #{ticket.id}
+            </span>
 
                         <h1>{ticket.title}</h1>
 
-                        <div className="ticket-meta">
-              <span>
-                <CalendarDays size={15} />
-                Created {formatDate(ticket.createdAt)}
-              </span>
-
-                            <span>
-                <Clock3 size={15} />
-                Updated {formatDate(ticket.updatedAt)}
-              </span>
-                        </div>
+                        <p className="ticket-created">
+                            Created {formatDate(ticket.createdAt)}
+                        </p>
                     </div>
 
                     <span
-                        className={`priority-badge ${ticket.priority.toLowerCase()}`}
+                        className={`status-badge status-${ticket.status.toLowerCase()}`}
                     >
-            {priorityLabels[ticket.priority] ?? ticket.priority}
+            {statusLabels[ticket.status]}
           </span>
                 </section>
 
-                {/* Main content and properties */}
+                {/* Main content */}
                 <div className="ticket-details-layout">
-                    <div className="ticket-details-main">
+                    <section className="ticket-main-content">
                         {/* Description */}
-                        <section className="details-card">
-                            <div className="details-card-heading">
-                                <h2>Description</h2>
-                            </div>
-
-                            <div className="ticket-description">
-                                {ticket.description || "No description provided."}
-                            </div>
-                        </section>
+                        <div className="details-card">
+                            <h2>Description</h2>
+                            <p className="ticket-description">
+                                {ticket.description}
+                            </p>
+                        </div>
 
                         {/* Conversation */}
-                        <section className="details-card conversation-card">
-                            <div className="details-card-heading">
-                                <h2>
-                                    <MessageSquare size={18} />
-                                    Conversation
-                                </h2>
-
-                                <span>{comments.length} comments</span>
+                        <div className="details-card conversation-card">
+                            <div className="section-heading">
+                                <MessageSquare size={18} />
+                                <h2>Conversation</h2>
                             </div>
 
-                            <div className="comments-list">
-                                {comments.map((comment) => (
-                                    <div className="comment-item" key={comment.id}>
-                                        <div className="comment-avatar">
-                                            {comment.author.charAt(0)}
-                                        </div>
+                            <div className="conversation-list">
+                                {localComments.length === 0 ? (
+                                    <p className="empty-conversation">
+                                        No messages yet.
+                                    </p>
+                                ) : (
+                                    localComments.map((message, index) => (
+                                        <div
+                                            className="conversation-message"
+                                            key={`${index}-${message}`}
+                                        >
+                                            <div className="message-avatar">A</div>
 
-                                        <div className="comment-content">
-                                            <div className="comment-header">
-                                                <strong>{comment.author}</strong>
-                                                <span>{comment.createdAt}</span>
+                                            <div className="message-content">
+                                                <div className="message-meta">
+                                                    <strong>Alex Morgan</strong>
+                                                    <span>Just now</span>
+                                                </div>
+
+                                                <p>{message}</p>
                                             </div>
-
-                                            <p>{comment.message}</p>
                                         </div>
-                                    </div>
-                                ))}
+                                    ))
+                                )}
                             </div>
 
-                            {/* Reply form */}
                             <form
-                                className="reply-form"
-                                onSubmit={handleReply}
+                                className="comment-form"
+                                onSubmit={handleAddComment}
                             >
                 <textarea
-                    value={reply}
+                    value={comment}
                     onChange={(event) =>
-                        setReply(event.target.value)
+                        setComment(event.target.value)
                     }
                     placeholder="Write a reply..."
                     rows={3}
                 />
 
-                                <div className="reply-actions">
-                                    <button
-                                        type="submit"
-                                        className="reply-button"
-                                        disabled={!reply.trim()}
-                                    >
-                                        <Send size={15} />
-                                        Send reply
-                                    </button>
-                                </div>
+                                <button
+                                    type="submit"
+                                    className="primary-button"
+                                    disabled={!comment.trim()}
+                                >
+                                    <Send size={15} />
+                                    Send reply
+                                </button>
                             </form>
-                        </section>
-                    </div>
+                        </div>
+                    </section>
 
                     {/* Ticket properties */}
-                    <aside className="ticket-properties">
-                        <section className="details-card">
-                            <div className="details-card-heading">
-                                <h2>Ticket properties</h2>
-                            </div>
+                    <aside className="ticket-sidebar">
+                        <div className="details-card properties-card">
+                            <h2>Properties</h2>
 
                             {/* Status */}
                             <div className="property-field">
@@ -351,25 +306,34 @@ function TicketDetails() {
                                 <select
                                     id="ticket-status"
                                     value={ticket.status}
-                                    onChange={handleStatusChange}
                                     disabled={
-                                        ticket.status === "CLOSED" ||
-                                        updateMutation.isPending
+                                        statusMutation.isPending ||
+                                        ticket.status === "CLOSED"
+                                    }
+                                    onChange={(event) =>
+                                        statusMutation.mutate(
+                                            event.target.value as ApiTicketStatus
+                                        )
                                     }
                                 >
-                                    {availableStatusOptions.map((option) => (
-                                        <option
-                                            key={option.value}
-                                            value={option.value}
-                                        >
-                                            {option.label}
-                                        </option>
-                                    ))}
+                                    <option value={ticket.status}>
+                                        {statusLabels[ticket.status]}
+                                    </option>
+
+                                    {allowedTransitions
+                                        .filter(
+                                            (status) => status !== ticket.status
+                                        )
+                                        .map((status) => (
+                                            <option key={status} value={status}>
+                                                {statusLabels[status]}
+                                            </option>
+                                        ))}
                                 </select>
 
-                                {updateMutation.isPending && (
-                                    <span className="property-hint">
-                    Updating status...
+                                {statusMutation.isError && (
+                                    <span className="field-error">
+                    {statusMutation.error.message}
                   </span>
                                 )}
                             </div>
@@ -378,48 +342,70 @@ function TicketDetails() {
                             <div className="property-field">
                                 <label>Priority</label>
 
-                                <div
-                                    className={`property-value priority-text ${ticket.priority.toLowerCase()}`}
+                                <span
+                                    className={`priority-value priority-${ticket.priority.toLowerCase()}`}
                                 >
-                                    {priorityLabels[ticket.priority] ??
-                                        ticket.priority}
-                                </div>
+                  {priorityLabels[ticket.priority] ??
+                      ticket.priority}
+                </span>
                             </div>
 
                             {/* Assignee */}
                             <div className="property-field">
                                 <label>Assignee</label>
 
-                                <div className="property-value assignee-value">
-                                    <UserRound size={16} />
-                                    {ticket.assignee?.name ?? "Unassigned"}
+                                <div className="assignee-value">
+                                    <User size={16} />
+
+                                    <span>
+                    {ticket.assignee?.name ?? "Unassigned"}
+                  </span>
                                 </div>
+
+                                {ticket.assignee && (
+                                    <button
+                                        type="button"
+                                        className="text-button"
+                                        disabled={unassignMutation.isPending}
+                                        onClick={() => unassignMutation.mutate()}
+                                    >
+                                        <UserX size={14} />
+                                        Unassign
+                                    </button>
+                                )}
+
+                                {unassignMutation.isError && (
+                                    <span className="field-error">
+                    {unassignMutation.error.message}
+                  </span>
+                                )}
                             </div>
 
-                            {/* Assignee ID */}
+                            {/* Requester / assignee information */}
                             {ticket.assignee && (
                                 <div className="property-field">
-                                    <label>Assignee ID</label>
-                                    <div className="property-value">
-                                        {ticket.assignee.id}
-                                    </div>
+                                    <label>Assignee email</label>
+                                    <span>{ticket.assignee.email}</span>
                                 </div>
                             )}
 
-                            {updateMutation.isError && (
-                                <p className="property-error">
-                                    {updateMutation.error instanceof Error
-                                        ? updateMutation.error.message
-                                        : "Unable to update ticket."}
-                                </p>
-                            )}
+                            {/* Dates */}
+                            <div className="property-field">
+                                <label>
+                                    <Calendar size={14} />
+                                    Created
+                                </label>
+                                <span>{formatDate(ticket.createdAt)}</span>
+                            </div>
 
-                            {updateMutation.isSuccess && (
-                                <p className="property-success">
-                                    Ticket updated successfully.
-                                </p>
-                            )}
-                        </section>
+                            <div className="property-field">
+                                <label>
+                                    <Calendar size={14} />
+                                    Last updated
+                                </label>
+                                <span>{formatDate(ticket.updatedAt)}</span>
+                            </div>
+                        </div>
                     </aside>
                 </div>
             </main>
