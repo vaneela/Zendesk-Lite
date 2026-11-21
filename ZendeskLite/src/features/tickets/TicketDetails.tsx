@@ -1,328 +1,411 @@
 
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import {
+    useMutation,
+    useQuery,
+    useQueryClient,
+} from "@tanstack/react-query";
+
 import {
     ArrowLeft,
     CalendarDays,
     Clock3,
     MessageSquare,
     Send,
+    Ticket as TicketIcon,
     UserRound,
 } from "lucide-react";
 
 import {
-    tickets as initialTickets,
-    type Ticket,
-    type TicketStatus,
-    type TicketPriority,
-} from "../../data/tickets";
+    getTicketById,
+    updateTicket,
+    type ApiTicketStatus,
+} from "./ticketApi";
 
 import "./TicketDetails.css";
 
-interface TicketComment {
+interface Comment {
     id: number;
     author: string;
     message: string;
     createdAt: string;
 }
 
-const agents = [
-    "Alex Morgan",
-    "Sarah Wilson",
-    "John Carter",
-    "Unassigned",
+const statusOptions: {
+    label: string;
+    value: ApiTicketStatus;
+}[] = [
+    { label: "Open", value: "OPEN" },
+    { label: "Pending", value: "PENDING" },
+    { label: "In Progress", value: "IN_PROGRESS" },
+    { label: "Solved", value: "SOLVED" },
+    { label: "Closed", value: "CLOSED" },
 ];
 
-const initialComments: TicketComment[] = [
-    {
-        id: 1,
-        author: "Sarah Wilson",
-        message:
-            "I've started investigating this issue. Could you please share the exact error message you're receiving?",
-        createdAt: "Today, 10:30 AM",
-    },
-    {
-        id: 2,
-        author: "Alex Morgan",
-        message:
-            "The issue appears to be related to the authentication service. I'm looking into the logs.",
-        createdAt: "Today, 10:45 AM",
-    },
-];
+const priorityLabels: Record<string, string> = {
+    LOW: "Low",
+    MEDIUM: "Medium",
+    HIGH: "High",
+    URGENT: "Urgent",
+};
 
-export default function TicketDetails() {
-    const { ticketId } = useParams();
+function formatDate(date: string) {
+    return new Date(date).toLocaleString("en-IN", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+    });
+}
+
+function TicketDetails() {
+    const { ticketId } = useParams<{ ticketId: string }>();
     const navigate = useNavigate();
-
-    const [ticket, setTicket] = useState<Ticket | undefined>(() =>
-        initialTickets.find((item) => item.id === ticketId)
-    );
-
-    const [comments, setComments] =
-        useState<TicketComment[]>(initialComments);
+    const queryClient = useQueryClient();
 
     const [reply, setReply] = useState("");
 
-    if (!ticket) {
-        return (
-            <div className="ticket-not-found">
-                <h2>Ticket not found</h2>
-                <p>This ticket may have been deleted or does not exist.</p>
-                <button onClick={() => navigate("/dashboard")}>
-                    <ArrowLeft size={16} />
-                    Back to dashboard
-                </button>
-            </div>
-        );
-    }
+    // Temporary local comments until comments API is connected.
+    const [comments, setComments] = useState<Comment[]>([
+        {
+            id: 1,
+            author: "Alex Morgan",
+            message: "We are looking into this issue.",
+            createdAt: "Today",
+        },
+    ]);
 
-    const updateTicket = <K extends keyof Ticket>(
-        field: K,
-        value: Ticket[K]
+    // Fetch ticket details.
+    const {
+        data: ticket,
+        isLoading,
+        isError,
+        error,
+    } = useQuery({
+        queryKey: ["ticket", ticketId],
+        queryFn: () => getTicketById(ticketId!),
+        enabled: Boolean(ticketId),
+        retry: false,
+    });
+
+    // Update ticket.
+    const updateMutation = useMutation({
+        mutationFn: (payload: {
+            status?: ApiTicketStatus;
+            assigneeId?: number | null;
+        }) => updateTicket(ticketId!, payload),
+
+        onSuccess: (updatedTicket) => {
+            queryClient.setQueryData(
+                ["ticket", ticketId],
+                updatedTicket
+            );
+
+            queryClient.invalidateQueries({
+                queryKey: ["tickets"],
+            });
+        },
+    });
+
+    const handleStatusChange = (
+        event: React.ChangeEvent<HTMLSelectElement>
     ) => {
-        setTicket((current) =>
-            current ? { ...current, [field]: value } : current
-        );
+        updateMutation.mutate({
+            status: event.target.value as ApiTicketStatus,
+        });
     };
 
-    const handleAddComment = (event: React.FormEvent<HTMLFormElement>) => {
+    const handleReply = (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
 
         if (!reply.trim()) return;
 
-        const newComment: TicketComment = {
+        const newComment: Comment = {
             id: Date.now(),
             author: "Alex Morgan",
             message: reply.trim(),
             createdAt: "Just now",
         };
 
-        setComments((current) => [...current, newComment]);
+        setComments((previous) => [...previous, newComment]);
         setReply("");
     };
 
+    // Loading state.
+    if (isLoading) {
+        return (
+            <div className="ticket-details-page">
+                <div className="details-loading">
+                    Loading ticket details...
+                </div>
+            </div>
+        );
+    }
+
+    // Error state.
+    if (isError) {
+        const isNotFound =
+            error instanceof Error &&
+            error.message.toLowerCase().includes("404");
+
+        return (
+            <div className="ticket-details-page">
+                <div className="details-error">
+                    <h2>
+                        {isNotFound
+                            ? "Ticket not found"
+                            : "Unable to load ticket"}
+                    </h2>
+
+                    <p>
+                        {error instanceof Error
+                            ? error.message
+                            : "Something went wrong."}
+                    </p>
+
+                    <button
+                        className="back-button"
+                        onClick={() => navigate("/dashboard")}
+                    >
+                        <ArrowLeft size={16} />
+                        Back to tickets
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
+    if (!ticket) {
+        return null;
+    }
+
     return (
-        <div className="app-shell">
+        <div className="ticket-details-page">
             {/* Header */}
-            <header className="ticket-details-header">
+            <header className="details-header">
                 <button
                     className="back-button"
                     onClick={() => navigate("/dashboard")}
                 >
                     <ArrowLeft size={17} />
-                    <span>Back to tickets</span>
+                    Back to tickets
                 </button>
 
-                <span className="details-brand">Zendesk Lite</span>
+                <div className="details-brand">
+          <span className="brand-icon">
+            <TicketIcon size={19} />
+          </span>
+                    <span>Zendesk Lite</span>
+                </div>
             </header>
 
-            <main className="ticket-details-page">
+            <main className="ticket-details-container">
                 {/* Breadcrumb */}
-                <div className="ticket-breadcrumb">
-          <span onClick={() => navigate("/dashboard")}>
+                <div className="details-breadcrumb">
+          <span
+              onClick={() => navigate("/dashboard")}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                      navigate("/dashboard");
+                  }
+              }}
+          >
             Tickets
           </span>
                     <span>/</span>
-                    <span>{ticket.id}</span>
+                    <span>{`#${ticket.id}`}</span>
                 </div>
 
                 {/* Ticket heading */}
-                <section className="ticket-detail-heading">
-                    <div className="ticket-heading-content">
-                        <div className="ticket-detail-id">
-                            <span className="detail-eyebrow">TICKET</span>
-                            <span>#{ticket.id}</span>
-                        </div>
+                <section className="ticket-details-heading">
+                    <div>
+                        <p className="ticket-reference">
+                            TICKET #{ticket.id}
+                        </p>
 
                         <h1>{ticket.title}</h1>
 
-                        <div className="ticket-heading-meta">
+                        <div className="ticket-meta">
               <span>
-                <CalendarDays size={14} />
-                Created {ticket.createdAt}
+                <CalendarDays size={15} />
+                Created {formatDate(ticket.createdAt)}
               </span>
 
                             <span>
-                <MessageSquare size={14} />
-                                {comments.length} comments
+                <Clock3 size={15} />
+                Updated {formatDate(ticket.updatedAt)}
               </span>
                         </div>
                     </div>
+
+                    <span
+                        className={`priority-badge ${ticket.priority.toLowerCase()}`}
+                    >
+            {priorityLabels[ticket.priority] ?? ticket.priority}
+          </span>
                 </section>
 
-                {/* Main content */}
-                <div className="ticket-detail-layout">
-                    {/* Conversation */}
-                    <section className="ticket-conversation">
-                        <div className="detail-section-heading">
-                            <div>
-                                <h2>Conversation</h2>
-                                <p>Ticket description and replies</p>
-                            </div>
-                        </div>
-
-                        {/* Original ticket description */}
-                        <article className="conversation-card original-message">
-                            <div className="conversation-author">
-                                <div className="comment-avatar customer-avatar">
-                                    C
-                                </div>
-
-                                <div>
-                                    <h4>Customer</h4>
-                                    <span>{ticket.createdAt}</span>
-                                </div>
+                {/* Main content and properties */}
+                <div className="ticket-details-layout">
+                    <div className="ticket-details-main">
+                        {/* Description */}
+                        <section className="details-card">
+                            <div className="details-card-heading">
+                                <h2>Description</h2>
                             </div>
 
-                            <div className="conversation-message">
-                                {ticket.description}
+                            <div className="ticket-description">
+                                {ticket.description || "No description provided."}
                             </div>
-                        </article>
+                        </section>
 
-                        {/* Comments */}
-                        <div className="comments-list">
-                            {comments.map((comment) => (
-                                <article className="conversation-card" key={comment.id}>
-                                    <div className="conversation-author">
+                        {/* Conversation */}
+                        <section className="details-card conversation-card">
+                            <div className="details-card-heading">
+                                <h2>
+                                    <MessageSquare size={18} />
+                                    Conversation
+                                </h2>
+
+                                <span>{comments.length} comments</span>
+                            </div>
+
+                            <div className="comments-list">
+                                {comments.map((comment) => (
+                                    <div className="comment-item" key={comment.id}>
                                         <div className="comment-avatar">
                                             {comment.author.charAt(0)}
                                         </div>
 
-                                        <div>
-                                            <h4>{comment.author}</h4>
-                                            <span>{comment.createdAt}</span>
+                                        <div className="comment-content">
+                                            <div className="comment-header">
+                                                <strong>{comment.author}</strong>
+                                                <span>{comment.createdAt}</span>
+                                            </div>
+
+                                            <p>{comment.message}</p>
                                         </div>
                                     </div>
-
-                                    <div className="conversation-message">
-                                        {comment.message}
-                                    </div>
-                                </article>
-                            ))}
-                        </div>
-
-                        {/* Reply box */}
-                        <form
-                            className="reply-box"
-                            onSubmit={handleAddComment}
-                        >
-                            <label htmlFor="ticket-reply">Add a reply</label>
-
-                            <textarea
-                                id="ticket-reply"
-                                value={reply}
-                                onChange={(event) => setReply(event.target.value)}
-                                placeholder="Write your reply here..."
-                                rows={4}
-                            />
-
-                            <div className="reply-footer">
-                                <span>Replying as Alex Morgan</span>
-
-                                <button
-                                    type="submit"
-                                    className="send-reply-button"
-                                    disabled={!reply.trim()}
-                                >
-                                    <Send size={14} />
-                                    Send reply
-                                </button>
+                                ))}
                             </div>
-                        </form>
-                    </section>
+
+                            {/* Reply form */}
+                            <form
+                                className="reply-form"
+                                onSubmit={handleReply}
+                            >
+                <textarea
+                    value={reply}
+                    onChange={(event) =>
+                        setReply(event.target.value)
+                    }
+                    placeholder="Write a reply..."
+                    rows={3}
+                />
+
+                                <div className="reply-actions">
+                                    <button
+                                        type="submit"
+                                        className="reply-button"
+                                        disabled={!reply.trim()}
+                                    >
+                                        <Send size={15} />
+                                        Send reply
+                                    </button>
+                                </div>
+                            </form>
+                        </section>
+                    </div>
 
                     {/* Ticket properties */}
                     <aside className="ticket-properties">
-                        <div className="properties-heading">
-                            <h2>Ticket properties</h2>
-                        </div>
+                        <section className="details-card">
+                            <div className="details-card-heading">
+                                <h2>Ticket properties</h2>
+                            </div>
 
-                        <div className="property-field">
-                            <label htmlFor="ticket-status">Status</label>
-
-                            <select
-                                id="ticket-status"
-                                value={ticket.status}
-                                onChange={(event) =>
-                                    updateTicket(
-                                        "status",
-                                        event.target.value as TicketStatus
-                                    )
-                                }
-                            >
-                                <option value="Open">Open</option>
-                                <option value="Pending">Pending</option>
-                                <option value="Solved">Solved</option>
-                                <option value="Closed">Closed</option>
-                            </select>
-                        </div>
-
-                        <div className="property-field">
-                            <label htmlFor="ticket-priority">Priority</label>
-
-                            <select
-                                id="ticket-priority"
-                                value={ticket.priority}
-                                onChange={(event) =>
-                                    updateTicket(
-                                        "priority",
-                                        event.target.value as TicketPriority
-                                    )
-                                }
-                            >
-                                <option value="Low">Low</option>
-                                <option value="Medium">Medium</option>
-                                <option value="High">High</option>
-                                <option value="Urgent">Urgent</option>
-                            </select>
-                        </div>
-
-                        <div className="property-field">
-                            <label htmlFor="ticket-assignee">Assignee</label>
-
-                            <div className="assignee-select-wrapper">
-                                <UserRound size={15} />
+                            {/* Status */}
+                            <div className="property-field">
+                                <label htmlFor="ticket-status">Status</label>
 
                                 <select
-                                    id="ticket-assignee"
-                                    value={ticket.assignee}
-                                    onChange={(event) =>
-                                        updateTicket("assignee", event.target.value)
-                                    }
+                                    id="ticket-status"
+                                    value={ticket.status}
+                                    onChange={handleStatusChange}
+                                    disabled={updateMutation.isPending}
                                 >
-                                    {agents.map((agent) => (
-                                        <option key={agent} value={agent}>
-                                            {agent}
+                                    {statusOptions.map((option) => (
+                                        <option
+                                            key={option.value}
+                                            value={option.value}
+                                        >
+                                            {option.label}
                                         </option>
                                     ))}
                                 </select>
+
+                                {updateMutation.isPending && (
+                                    <span className="property-hint">
+                    Updating status...
+                  </span>
+                                )}
                             </div>
-                        </div>
 
-                        <div className="property-divider" />
+                            {/* Priority */}
+                            <div className="property-field">
+                                <label>Priority</label>
 
-                        <div className="property-info">
-                            <span>Ticket ID</span>
-                            <strong>#{ticket.id}</strong>
-                        </div>
+                                <div
+                                    className={`property-value priority-text ${ticket.priority.toLowerCase()}`}
+                                >
+                                    {priorityLabels[ticket.priority] ??
+                                        ticket.priority}
+                                </div>
+                            </div>
 
-                        <div className="property-info">
-                            <span>Created</span>
-                            <strong>{ticket.createdAt}</strong>
-                        </div>
+                            {/* Assignee */}
+                            <div className="property-field">
+                                <label>Assignee</label>
 
-                        <div className="property-info">
-                            <span>Last activity</span>
-                            <strong>
-                                <Clock3 size={13} />
-                                {comments.length > 0
-                                    ? comments[comments.length - 1].createdAt
-                                    : ticket.createdAt}
-                            </strong>
-                        </div>
+                                <div className="property-value assignee-value">
+                                    <UserRound size={16} />
+                                    {ticket.assignee?.name ?? "Unassigned"}
+                                </div>
+                            </div>
+
+                            {/* Assignee ID */}
+                            {ticket.assignee && (
+                                <div className="property-field">
+                                    <label>Assignee ID</label>
+                                    <div className="property-value">
+                                        {ticket.assignee.id}
+                                    </div>
+                                </div>
+                            )}
+
+                            {updateMutation.isError && (
+                                <p className="property-error">
+                                    {updateMutation.error instanceof Error
+                                        ? updateMutation.error.message
+                                        : "Unable to update ticket."}
+                                </p>
+                            )}
+
+                            {updateMutation.isSuccess && (
+                                <p className="property-success">
+                                    Ticket updated successfully.
+                                </p>
+                            )}
+                        </section>
                     </aside>
                 </div>
             </main>
         </div>
     );
 }
+
+export default TicketDetails;

@@ -1,62 +1,171 @@
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+
 import Header from "../../components/Header";
 import TicketCard from "../../components/TicketCard";
 import CreateTicketModal from "../../components/CreateTicketModal";
-import { tickets as initialTickets } from "../../data/tickets";
-import type { Ticket } from "../../data/tickets";
-import "./Dashboard.css";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 
-const STATUSES = ["Open", "Pending", "Solved", "Closed"] as const;
+import type {
+    Ticket,
+    TicketStatus,
+    TicketPriority,
+} from "../../data/tickets";
 
-type TicketStatus = (typeof STATUSES)[number];
-type Filter = "All tickets" | "My tickets" | "Unassigned";
+import { getTickets, createTicket } from "./ticketApi";
 
-const FILTERS: Filter[] = [
-    "All tickets",
-    "My tickets",
-    "Unassigned",
+// Temporary logged-in user.
+// Later, this information will come from authentication.
+type UserRole = "Admin" | "User" | "Agent";
+
+const currentUser = {
+    name: "Alex Morgan",
+    role: "Admin" as UserRole,
+};
+
+const statuses: TicketStatus[] = [
+    "Open",
+    "Pending",
+    "Solved",
+    "Closed",
 ];
 
-export default function Dashboard() {
-    const [ticketList, setTicketList] = useState<Ticket[]>(initialTickets);
+type FilterType = "all" | "mine" | "unassigned";
+
+function Dashboard() {
     const [activeFilter, setActiveFilter] =
-        useState<Filter>("All tickets");
-    const [showModal, setShowModal] = useState(false);
+        useState<FilterType>("all");
 
-    // Apply the selected filter
-    const filteredTickets = useMemo(() => {
-        return ticketList.filter((ticket) => {
-            if (activeFilter === "My tickets") {
-                return ticket.assignee === "Alex Morgan";
-            }
+    const [isModalOpen, setIsModalOpen] = useState(false);
 
-            if (activeFilter === "Unassigned") {
-                return ticket.assignee === "Unassigned";
-            }
+    const queryClient = useQueryClient();
 
-            return true;
-        });
-    }, [ticketList, activeFilter]);
+    const createTicketMutation = useMutation({
+        mutationFn: createTicket,
 
-    // Create a new ticket
-    const handleCreateTicket = (data: {
-        title: string;
-        description: string;
-        priority: Ticket["priority"];
-    }) => {
-        const newTicket: Ticket = {
-            id: `ticket-${Date.now()}`,
-            ...data,
-            status: "Open",
-            assignee: "Unassigned",
-            createdAt: "Just now",
+        onSuccess: () => {
+            queryClient.invalidateQueries({
+                queryKey: ["tickets"],
+            });
+
+            setIsModalOpen(false);
+        },
+    });
+
+    // Fetch tickets using TanStack Query.
+    const {
+        data,
+        isLoading,
+        isError,
+        error,
+        refetch,
+    } = useQuery({
+        queryKey: ["tickets"],
+        queryFn: getTickets,
+    });
+
+    const mapStatus = (status: string): TicketStatus => {
+        const statusMap: Record<string, TicketStatus> = {
+            OPEN: "Open",
+            PENDING: "Pending",
+            IN_PROGRESS: "Pending",
+            SOLVED: "Solved",
+            CLOSED: "Closed",
         };
 
-        setTicketList((current) => [newTicket, ...current]);
-        setActiveFilter("All tickets");
-        setShowModal(false);
+        return statusMap[status] ?? "Open";
     };
+
+    // Convert backend response into frontend Ticket structure.
+    const apiTickets: Ticket[] = (data?.content ?? []).map(
+        (ticket) => ({
+            id: String(ticket.id),
+            title: ticket.title,
+            description: ticket.description ?? "",
+            status: mapStatus(ticket.status),
+            priority:
+                ticket.priority.charAt(0) +
+                ticket.priority.slice(1).toLowerCase(),
+            assignee: ticket.assignee?.name ?? "Unassigned",
+            createdAt: new Date(ticket.createdAt).toLocaleString(),
+        })
+    );
+
+// API tickets are the source of truth.
+    const tickets = apiTickets;
+
+    // Apply selected filter.
+    const filteredTickets = tickets.filter((ticket) => {
+        if (
+            activeFilter === "mine" &&
+            currentUser.role === "Agent"
+        ) {
+            return ticket.assignee === currentUser.name;
+        }
+
+        if (activeFilter === "unassigned") {
+            return ticket.assignee === "Unassigned";
+        }
+
+        return true;
+    });
+
+
+    const handleCreateTicket = (ticketData: {
+        title: string;
+        description: string;
+        priority: TicketPriority;
+    }) => {
+        createTicketMutation.mutate({
+            title: ticketData.title,
+            description: ticketData.description,
+            priority: ticketData.priority.toUpperCase() as
+                | "LOW"
+                | "MEDIUM"
+                | "HIGH"
+                | "URGENT",
+        });
+    };
+
+    // Loading state.
+    if (isLoading) {
+        return (
+            <div className="app-shell">
+                <Header />
+                <main className="dashboard">
+                    <div className="dashboard-message">
+                        Loading tickets...
+                    </div>
+                </main>
+            </div>
+        );
+    }
+
+    // Error state.
+    if (isError) {
+        return (
+            <div className="app-shell">
+                <Header />
+                <main className="dashboard">
+                    <div className="dashboard-message error">
+                        <p>
+                            {error instanceof Error
+                                ? error.message
+                                : "Something went wrong while fetching tickets."}
+                        </p>
+
+                        <button
+                            className="primary-button"
+                            onClick={() => refetch()}
+                        >
+                            Try again
+                        </button>
+                    </div>
+                </main>
+            </div>
+        );
+    }
 
     return (
         <div className="app-shell">
@@ -65,108 +174,109 @@ export default function Dashboard() {
             <main className="dashboard">
                 {/* Welcome section */}
                 <section className="welcome-banner">
-                    <div className="welcome-content">
-                        <span className="eyebrow">YOUR WORKSPACE</span>
-
-                        <h1>Good morning, Alex</h1>
-
+                    <div>
+                        <p className="eyebrow">SUPPORT OVERVIEW</p>
+                        <h1>Welcome back, {currentUser.name}</h1>
                         <p>
-                            Keep your team's support moving.
-                            Here's what's happening with your tickets.
+                            Here's what's happening with your support tickets.
                         </p>
                     </div>
 
+                    {(currentUser.role === "Admin" ||
+                        currentUser.role === "User") && (
+                        <button
+                            className="primary-button"
+                            onClick={() => setIsModalOpen(true)}
+                        >
+                            + Create Ticket
+                        </button>
+                    )}
+                </section>
+
+                {/* Ticket filters */}
+                <section className="filter-bar">
                     <button
-                        className="primary-button"
-                        onClick={() => setShowModal(true)}
+                        className={`filter-button ${
+                            activeFilter === "all" ? "active" : ""
+                        }`}
+                        onClick={() => setActiveFilter("all")}
                     >
-                        <span>+</span>
-                        Create ticket
+                        All Tickets
+                    </button>
+
+                    {currentUser.role === "Agent" && (
+                        <button
+                            className={`filter-button ${
+                                activeFilter === "mine" ? "active" : ""
+                            }`}
+                            onClick={() => setActiveFilter("mine")}
+                        >
+                            My Tickets
+                        </button>
+                    )}
+
+                    <button
+                        className={`filter-button ${
+                            activeFilter === "unassigned" ? "active" : ""
+                        }`}
+                        onClick={() => setActiveFilter("unassigned")}
+                    >
+                        Unassigned
                     </button>
                 </section>
 
-                {/* Ticket board */}
-                <section className="ticket-section">
-                    <div className="section-heading">
-                        <div>
-                            <h2>Tickets</h2>
-                            <p>Manage and track your team's requests.</p>
-                        </div>
+                {/* Ticket count */}
+                <p className="ticket-count">
+                    Showing {filteredTickets.length} tickets
+                    {data && ` of ${data.totalElements}`}
+                </p>
 
-                        <span className="total-tickets">
-              {filteredTickets.length} tickets
-            </span>
-                    </div>
+                {/* Four horizontal swimlanes */}
+                <section className="swimlane-board">
+                    {statuses.map((status) => {
+                        const laneTickets = filteredTickets.filter(
+                            (ticket) => ticket.status === status
+                        );
 
-                    {/* Quick filters */}
-                    <div className="filter-bar">
-                        {FILTERS.map((filter) => (
-                            <button
-                                key={filter}
-                                className={`filter-button ${
-                                    activeFilter === filter ? "active" : ""
-                                }`}
-                                onClick={() => setActiveFilter(filter)}
-                            >
-                                {filter}
-                            </button>
-                        ))}
-                    </div>
+                        return (
+                            <div className="swimlane" key={status}>
+                                <div className="swimlane-header">
+                                    <h2>{status}</h2>
 
-                    {/* Four swimlanes */}
-                    <div className="swimlane-board">
-                        {STATUSES.map((status: TicketStatus) => {
-                            const laneTickets = filteredTickets.filter(
-                                (ticket) => ticket.status === status
-                            );
+                                    <span className="lane-count">
+                    {laneTickets.length}
+                  </span>
+                                </div>
 
-                            return (
-                                <section
-                                    className="swimlane"
-                                    key={status}
-                                >
-                                    <div className="swimlane-header">
-                                        <div className="lane-title">
-                      <span
-                          className={`status-indicator status-${status.toLowerCase()}`}
-                      />
-
-                                            <h3>{status}</h3>
-                                        </div>
-
-                                        <span className="lane-count">
-                      {laneTickets.length}
-                    </span>
-                                    </div>
-
-                                    <div className="swimlane-cards">
-                                        {laneTickets.length > 0 ? (
-                                            laneTickets.map((ticket) => (
-                                                <TicketCard
-                                                    key={ticket.id}
-                                                    ticket={ticket}
-                                                />
-                                            ))
-                                        ) : (
-                                            <div className="lane-empty">
-                                                No {status.toLowerCase()} tickets
-                                            </div>
-                                        )}
-                                    </div>
-                                </section>
-                            );
-                        })}
-                    </div>
+                                <div className="swimlane-cards">
+                                    {laneTickets.length > 0 ? (
+                                        laneTickets.map((ticket) => (
+                                            <TicketCard
+                                                key={ticket.id}
+                                                ticket={ticket}
+                                            />
+                                        ))
+                                    ) : (
+                                        <p className="lane-empty">
+                                            No {status.toLowerCase()} tickets
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+                        );
+                    })}
                 </section>
             </main>
 
             {/* Create ticket modal */}
-            {showModal && (
+            {isModalOpen && (
                 <CreateTicketModal
-                    onClose={() => setShowModal(false)}
+                    onClose={() => setIsModalOpen(false)}
                     onCreate={handleCreateTicket}
                 />
             )}
         </div>
     );
 }
+
+export default Dashboard;
