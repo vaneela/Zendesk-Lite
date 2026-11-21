@@ -39,10 +39,22 @@ const statusOptions: {
 }[] = [
     { label: "Open", value: "OPEN" },
     { label: "Pending", value: "PENDING" },
-    { label: "In Progress", value: "IN_PROGRESS" },
     { label: "Solved", value: "SOLVED" },
     { label: "Closed", value: "CLOSED" },
 ];
+
+const allowedTransitions: Record<
+    ApiTicketStatus,
+    ApiTicketStatus[]
+> = {
+    OPEN: ["OPEN", "PENDING"],
+    PENDING: ["PENDING", "SOLVED"],
+    SOLVED: ["SOLVED", "CLOSED", "PENDING"],
+    CLOSED: ["CLOSED"],
+
+    // Legacy status, if existing tickets still use it.
+    IN_PROGRESS: ["IN_PROGRESS", "SOLVED"],
+};
 
 const priorityLabels: Record<string, string> = {
     LOW: "Low",
@@ -109,6 +121,9 @@ function TicketDetails() {
             });
         },
     });
+    const availableStatusOptions = statusOptions.filter((option) =>
+        allowedTransitions[ticket?.status ?? "OPEN"].includes(option.value)
+    );
 
     const handleStatusChange = (
         event: ChangeEvent<HTMLSelectElement>
@@ -337,9 +352,12 @@ function TicketDetails() {
                                     id="ticket-status"
                                     value={ticket.status}
                                     onChange={handleStatusChange}
-                                    disabled={updateMutation.isPending}
+                                    disabled={
+                                        ticket.status === "CLOSED" ||
+                                        updateMutation.isPending
+                                    }
                                 >
-                                    {statusOptions.map((option) => (
+                                    {availableStatusOptions.map((option) => (
                                         <option
                                             key={option.value}
                                             value={option.value}

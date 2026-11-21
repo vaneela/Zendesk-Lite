@@ -7,7 +7,6 @@ import {
 export type ApiTicketStatus =
     | "OPEN"
     | "PENDING"
-    | "IN_PROGRESS"
     | "SOLVED"
     | "CLOSED";
 

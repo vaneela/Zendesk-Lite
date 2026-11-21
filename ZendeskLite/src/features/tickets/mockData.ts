@@ -74,7 +74,7 @@ const initialTickets: ApiTicket[] = [
         title: "Password reset email not received",
         description:
             "Customer is not receiving password reset emails.",
-        status: "IN_PROGRESS",
+        status: "PENDING",
         priority: "MEDIUM",
         assignee: mockAgents[0],
         createdAt: "2026-11-20T11:00:00",
@@ -85,7 +85,7 @@ const initialTickets: ApiTicket[] = [
         title: "Profile image not updating",
         description:
             "Uploaded profile image does not appear after saving.",
-        status: "IN_PROGRESS",
+        status: "PENDING",
         priority: "LOW",
         assignee: mockAgents[1],
         createdAt: "2026-11-19T16:00:00",
